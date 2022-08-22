@@ -4,6 +4,7 @@
 #include "picohttpparser.c"
 #include <map>
 #include <charconv>
+#include <functional>
 
 namespace ez {
 
