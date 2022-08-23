@@ -1,9 +1,11 @@
 cmake_minimum_required(VERSION 3.5)
 
 project(ez LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 17)
 
 include_directories(
     include
+    tls/include
 )
 
 set(SOURCES
@@ -11,10 +13,13 @@ set(SOURCES
     source/buffer.cpp
     source/socket.cpp
     source/http.cpp
+    source/tls.cpp
     source/hex.cpp
     source/base64.cpp
     source/url.cpp
 )
+
+add_subdirectory(tls)
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR 
     CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
@@ -24,4 +29,6 @@ elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
 endif()
 
 add_library(${PROJECT_NAME} ${SOURCES})
-target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
+
+add_executable(test test.cpp)
+target_link_libraries(test ${PROJECT_NAME} tls pthread)

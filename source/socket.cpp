@@ -483,6 +483,7 @@ void socket::connect(ipv4_t _address, uint16_t _port, unsigned _timeout, ipv4_t 
     if (res == 0)
     {
         m_state = socket::state::connected;
+        set_nonblocking(false);
         return;
     }
     else if (res == -1)
