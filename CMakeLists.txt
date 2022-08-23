@@ -3,6 +3,8 @@ cmake_minimum_required(VERSION 3.5)
 project(ez LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 
+option (EZ_WITH_TEST "" ON)
+
 include_directories(
     include
     tls/include
@@ -29,6 +31,9 @@ elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
 endif()
 
 add_library(${PROJECT_NAME} ${SOURCES})
+target_link_libraries(${PROJECT_NAME} tls pthread)
 
-add_executable(test test.cpp)
-target_link_libraries(test ${PROJECT_NAME} tls pthread)
+if (EZ_WITH_TEST)
+    add_executable(test test.cpp)
+    target_link_libraries(test ${PROJECT_NAME} ez)
+endif()

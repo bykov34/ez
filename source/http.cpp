@@ -187,6 +187,7 @@ http::http::request_t http::http::impl::recv_request()
 
         case state_e::send_complete:
             reset();
+            [[fallthrough]];
 
         case state_e::waiting_header:
         {
@@ -355,6 +356,9 @@ http::http::request_t http::http::impl::recv_request()
                 }
             }
         }
+            
+        default:
+            throw error("invalid state");
     }
 }
 
@@ -365,8 +369,6 @@ http::response_t http::recv_response()
     return m_impl->recv_response();
 }
 
-
-
 http::response_t http::impl::recv_response()
 {
     switch (m_state)
@@ -376,6 +378,7 @@ http::response_t http::impl::recv_response()
 
         case state_e::send_complete:
             reset();
+            [[fallthrough]];
 
         case state_e::waiting_header:
         {
@@ -542,6 +545,9 @@ http::response_t http::impl::recv_response()
                 }
             }
         }
+            
+        default:
+            throw error("invalid state");
     }
 }
 
