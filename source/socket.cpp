@@ -374,11 +374,7 @@ void socket::listen(std::string_view _adr, size_t _max_clients, bool _share)
 {
     if (m_fd == -1)
     {
-#if defined(__APPLE__)
         m_fd = ::socket(AF_UNIX, SOCK_STREAM, 0);
-#else
-        m_fd = ::socket(AF_UNIX, SOCK_SEQPACKET, 0);
-#endif
         if (m_fd == -1)
             throw socket::error("can't create socket");
     }
@@ -537,11 +533,7 @@ void socket::connect(std::string_view _adr, unsigned _timeout)
 {
     if (m_fd == -1)
     {
-#if defined(__APPLE__)
         m_fd = ::socket(AF_UNIX, SOCK_STREAM, 0);
-#else
-        m_fd = ::socket(AF_UNIX, SOCK_SEQPACKET, 0);
-#endif
         if (m_fd == -1)
             throw socket::error("can't create socket");
     }
