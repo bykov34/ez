@@ -1,10 +1,6 @@
 
 project (tls LANGUAGES C)
 
-if (APPLE)
-  set(OPENSSL_ROOT_DIR /usr/local/opt/openssl@1.1)
-endif()
-
 find_package(OpenSSL REQUIRED)
 
 include(CheckFunctionExists)

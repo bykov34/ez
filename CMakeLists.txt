@@ -19,6 +19,7 @@ set(SOURCES
     source/hex.cpp
     source/base64.cpp
     source/url.cpp
+    source/smp.cpp
 )
 
 add_subdirectory(tls)
