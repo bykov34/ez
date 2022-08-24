@@ -5,6 +5,7 @@
 #include <map>
 #include <charconv>
 #include <functional>
+#include <algorithm>
 
 namespace ez {
 
@@ -42,6 +43,15 @@ struct http::impl
     void send_more();
     void send_request(std::string_view _method, std::string_view _path, const headers_t& _hdrs, buffer _body);
     void send_response(unsigned _code, std::string_view _message, const headers_t& _hdrs, buffer _body);
+    
+    bool isequal(const std::string& a, const std::string& b)
+    {
+        return std::equal(a.begin(), a.end(),
+                          b.begin(), b.end(),
+                          [](char a, char b) {
+                              return std::tolower(a) == std::tolower(b);
+                          });
+    }
   
     request_t recv();
     response_t recv_response();
@@ -218,7 +228,7 @@ http::http::request_t http::http::impl::recv_request()
 
                             m_headers.insert({field, value});
 
-                            if (field == "Content-Length")
+                            if (isequal(field,"Content-Length"))
                             {
                                 unsigned size = 0;
                                 if (auto [p, ec] = std::from_chars(value.data(), value.data() + value.size(), size); ec == std::errc())
@@ -226,7 +236,7 @@ http::http::request_t http::http::impl::recv_request()
                                 else
                                     throw error("http: can't parse 'Content-Length' value");
                             }
-                            else if (field == "Transfer-Encoding")
+                            else if (isequal(field,"Transfer-Encoding"))
                             {
                                 if (value == "chunked")
                                 {
@@ -408,7 +418,7 @@ http::response_t http::impl::recv_response()
 
                             m_headers.insert({field, value});
 
-                            if (field == "Content-Length")
+                            if (isequal(field,"Content-Length"))
                             {
                                 unsigned size = 0;
                                 if (auto [p, ec] = std::from_chars(value.data(), value.data() +
@@ -417,7 +427,7 @@ http::response_t http::impl::recv_response()
                                 else
                                     throw error("http: can't parse 'Content-Length' value");
                             }
-                            else if (field == "Transfer-Encoding")
+                            else if (isequal(field,"Transfer-Encoding"))
                             {
                                 if (value == "chunked")
                                 {
