@@ -38,6 +38,7 @@ namespace ez
 
             void set_timeout(unsigned _timeout);
             void set_nonblocking(bool _flag);
+            void set_close_on_exec();
 
             void listen(ipv4_t _address, uint16_t _port, size_t _max_clients, bool _share);
             void listen(std::string_view _adr, size_t _max_clients, bool _share);
