@@ -145,6 +145,16 @@ void socket::set_nonblocking(bool _flag)
 
 // ------------------------------------------------------------------------------------------
 
+void socket::set_close_on_exec()
+{
+    if (m_fd == -1)
+        return;
+    
+    fcntl(m_fd, F_SETFD, FD_CLOEXEC);
+}
+
+// ------------------------------------------------------------------------------------------
+
 void socket::set_timeout(unsigned _timeout)
 {
     if (m_fd == -1)

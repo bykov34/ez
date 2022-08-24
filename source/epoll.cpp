@@ -60,6 +60,7 @@ event_loop::event_loop() : m_impl(new impl)
 void event_loop::init()
 {
     m_impl->m_epoll = epoll_create(1);
+    fcntl(m_impl->m_epoll, F_SETFD, FD_CLOEXEC);
 }
 
 event_loop::~event_loop()
@@ -110,6 +111,7 @@ void event_loop::start(int _timeout)
     if (m_impl->m_stop_fd == -1)
         throw std::runtime_error("eventfd() main error");
 
+    fcntl(m_impl->m_stop_fd, F_SETFD, FD_CLOEXEC);
     epoll_add(m_impl->m_epoll, m_impl->m_stop_fd, EPOLLIN);
 
     m_impl->process_events(m_impl->m_epoll, m_impl->m_stop_fd, _timeout);

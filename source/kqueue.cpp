@@ -72,6 +72,7 @@ event_loop::event_loop() : m_impl(new impl)
 void event_loop::init()
 {
     m_impl->m_kqueue = kqueue();
+    fcntl(m_impl->m_kqueue, F_SETFD, FD_CLOEXEC);
 }
 
 event_loop::~event_loop()
@@ -122,6 +123,8 @@ void event_loop::start(int _timeout)
 
     if ( pipe(m_impl->m_stop_fd) == 0)
     {
+        fcntl(m_impl->m_stop_fd[0], F_SETFD, FD_CLOEXEC);
+        fcntl(m_impl->m_stop_fd[1], F_SETFD, FD_CLOEXEC);
         kqueue_add(m_impl->m_kqueue, m_impl->m_stop_fd[0], true);
     }
     else
