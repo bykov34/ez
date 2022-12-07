@@ -13,6 +13,15 @@ namespace ez
     {
         struct impl; impl* m_impl;
         public:
+        
+            enum class state_e
+            {
+                waiting_meta,
+                waiting_header,
+                waiting_body,
+                sending_data,
+                send_complete
+            };
 
             class error : public std::runtime_error
             {
@@ -24,6 +33,8 @@ namespace ez
         
             smp(const smp& _right) = delete;
             const smp& operator = (const smp& _right) = delete;
+        
+            state_e state() const;
             void reset();
 
             bool have_body() const;

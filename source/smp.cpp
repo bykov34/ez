@@ -10,15 +10,6 @@
 
 namespace ez {
 
-enum class state_e
-{
-    waiting_meta,
-    waiting_header,
-    waiting_body,
-    sending_data,
-    send_complete
-};
-
 struct smp::impl
 {
     state_e         m_state = state_e::waiting_meta;
@@ -51,6 +42,11 @@ smp::smp(channel& _ch) : m_impl(new impl(_ch))
 smp::~smp()
 {
     delete m_impl;
+}
+
+smp::state_e smp::state() const
+{
+    return m_impl->m_state;
 }
 
 void smp::reset()
