@@ -19,7 +19,7 @@ namespace ez
             const buffer& operator = (const buffer& _right);
         
             explicit buffer(size_t _size);
-            buffer(const std::vector<std::uint8_t>&);
+            buffer(const std::vector<uint8_t>&);
             buffer(const void* _data, size_t _size, bool _copy = true);
             buffer(const std::string& _str);
             buffer(const std::string_view _str);

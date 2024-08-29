@@ -1,4 +1,4 @@
-/* $OpenBSD: tls_internal.h,v 1.80 2022/03/24 15:56:34 tb Exp $ */
+/* $OpenBSD: tls_internal.h,v 1.83 2023/06/27 18:19:59 tb Exp $ */
 /*
  * Copyright (c) 2014 Jeremie Courreges-Anglas <jca@openbsd.org>
  * Copyright (c) 2014 Joel Sing <jsing@openbsd.org>
@@ -26,9 +26,11 @@
 
 #include <openssl/ssl.h>
 
-__BEGIN_HIDDEN_DECLS
+#ifndef TLS_DEFAULT_CA_FILE
+#define TLS_DEFAULT_CA_FILE	"/etc/ssl/cert.pem"
+#endif
 
-#define TLS_CIPHERS_DEFAULT	TLS_CIPHERS_COMPAT
+#define TLS_CIPHERS_DEFAULT	"TLSv1.3:TLSv1.2+AEAD+ECDHE:TLSv1.2+AEAD+DHE"
 #define TLS_CIPHERS_COMPAT	"HIGH:!aNULL"
 #define TLS_CIPHERS_LEGACY	"HIGH:MEDIUM:!aNULL"
 #define TLS_CIPHERS_ALL		"ALL:!aNULL:!eNULL"
@@ -298,7 +300,6 @@ EC_KEY_METHOD *tls_signer_ecdsa_method(void);
 
 #define TLS_PADDING_NONE			0
 #define TLS_PADDING_RSA_PKCS1			1
-#define TLS_PADDING_RSA_X9_31			2
 
 int tls_config_set_sign_cb(struct tls_config *_config, tls_sign_cb _cb,
     void *_cb_arg);
@@ -313,8 +314,6 @@ int tls_signer_add_keypair_mem(struct tls_signer *_signer, const uint8_t *_cert,
 int tls_signer_sign(struct tls_signer *_signer, const char *_pubkey_hash,
     const uint8_t *_input, size_t _input_len, int _padding_type,
     uint8_t **_out_signature, size_t *_out_signature_len);
-
-__END_HIDDEN_DECLS
 
 /* XXX this function is not fully hidden so relayd can use it */
 void tls_config_skip_private_key_check(struct tls_config *config);

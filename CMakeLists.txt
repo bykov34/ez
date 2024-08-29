@@ -22,8 +22,6 @@ set(SOURCES
     source/smp.cpp
 )
 
-add_subdirectory(tls)
-
 if (CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR 
     CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
     list(APPEND SOURCES source/kqueue.cpp)
@@ -32,9 +30,8 @@ elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
 endif()
 
 add_library(${PROJECT_NAME} ${SOURCES})
-target_link_libraries(${PROJECT_NAME} tls pthread)
 
 if (EZ_WITH_TEST)
     add_executable(test test.cpp)
-    target_link_libraries(test ${PROJECT_NAME} ez)
+    target_link_libraries(test ${PROJECT_NAME} ez tls)
 endif()

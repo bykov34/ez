@@ -99,7 +99,7 @@ namespace ez
 
         return { (uint32_t) (*ip).s_addr };*/
         
-        return ipv4_t();
+        return {};
     }
 }
 

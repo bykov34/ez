@@ -2,6 +2,7 @@
 #pragma once
 
 #include <string_view>
+#include <inttypes.h>
 
 namespace ez
 {

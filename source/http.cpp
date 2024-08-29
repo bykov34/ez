@@ -1,5 +1,6 @@
 
 #include <ez/http.hpp>
+
 #include <string.h>
 #include "picohttpparser.c"
 #include <map>
@@ -588,16 +589,19 @@ void http::impl::send_response(unsigned _code, std::string_view _text, const hea
         resp += "\r\n";
     }
 
-    resp += "Content-Length: " + std::to_string(_body.size());
-    resp += "\r\n\r\n";
+    if (_body.size() > 0)
+    {
+        resp += "Content-Length: " + std::to_string(_body.size());
+        resp += "\r\n";
+    }
+
+    resp += "\r\n";
     
     auto size = resp.size() + _body.size();
     m_send_buffer = buffer(size);
 
     memcpy(m_send_buffer.ptr(), resp.c_str(), resp.size());
-    
-    if (_body.size() > 0)
-        memcpy(m_send_buffer.ptr() + resp.size(), _body.ptr(), _body.size());
+    memcpy(m_send_buffer.ptr() + resp.size(), _body.ptr(), _body.size());
 
     if (auto sz = m_channel.get().send(m_send_buffer); sz == m_send_buffer.size())
     {

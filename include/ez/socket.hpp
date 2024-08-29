@@ -1,13 +1,12 @@
 
 #pragma once
 
-#include "channel.hpp"
-#include "ip.hpp"
+#include <ez/channel.hpp>
+#include <ez/ip.hpp>
 
 namespace ez
 {
     class buffer;
-
     class socket final : public channel
     {
         public:
@@ -17,6 +16,7 @@ namespace ez
 #else
             using fd_t = int;
 #endif
+        
             enum class state : uint8_t
             {
                 disconnected,
@@ -33,6 +33,7 @@ namespace ez
             ~socket();
 
             fd_t fd() const;
+            uint16_t port() const;
             bool is(state) const;
             void close();
 
@@ -42,10 +43,11 @@ namespace ez
 
             void listen(ipv4_t _address, uint16_t _port, size_t _max_clients, bool _share);
             void listen(std::string_view _adr, size_t _max_clients, bool _share);
-        
+
             void connect(ipv4_t _address, uint16_t _port, unsigned _timeout, ipv4_t _bind_to = ipv4_t());
+            void connect_async(ipv4_t _address, uint16_t _port, ipv4_t _bind_to = ipv4_t());
             void connect(std::string_view _adr, unsigned _timeout);
-        
+
             socket accept();
 
             // channel interface
@@ -54,10 +56,12 @@ namespace ez
             size_t send(const uint8_t* _data, size_t _size) override;
             size_t recv(buffer& _data, size_t _desired_size = 0) override;
             size_t recv(uint8_t* _data, size_t _size, size_t _desired_size = 0) override;
+            bool can_read() const override;
     
         private:
             
             fd_t                    m_fd = -1;
+            uint16_t                m_port = 0;
             socket::state           m_state = socket::state::disconnected;
             bool                    m_nonblocking = false;
     };

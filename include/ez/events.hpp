@@ -19,13 +19,18 @@ namespace ez
             void init();
             ~event_loop();
         
-            using on_event_t = void(*)(void*, int, event_e);
-            using on_timeout_t = void(*)(void*);
+            using on_event_t = void(*)(void*, int, event_e, unsigned);
+            using on_timeout_t = void(*)(void*, unsigned);
 
-            void start(int _timeout = -1);
+            unsigned workers() const;
+
+            void start(unsigned _workers, int _timeout = -1);
             void stop();
 
             void add_fd(int _fd);
+            void add_fd(int _fd, unsigned _worker);
+
+            void remove_fd(int _fd, unsigned _worker);
 
             void on_event(void* _param, on_event_t);
             void on_timeout(on_timeout_t);

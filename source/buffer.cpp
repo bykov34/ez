@@ -50,7 +50,7 @@ namespace ez
         m_impl->m_orig_size = _size;
     }
 
-    buffer::buffer(const std::vector<std::uint8_t>& _vec) : m_impl(new impl)
+    buffer::buffer(const std::vector<uint8_t>& _vec) : m_impl(new impl)
     {
         m_impl->m_refs = 1;
         m_impl->m_data = new uint8_t[_vec.size()];

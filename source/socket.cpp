@@ -23,6 +23,7 @@
 #include <sys/time.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
+#include <sys/ioctl.h>
 #include <sys/un.h>
 
 #elif defined(WIN32)
@@ -96,7 +97,7 @@ socket::socket(socket&& _right)
 {
     m_fd = _right.m_fd;
     m_state = _right.m_state;
-    //m_port = _right.m_port;
+    m_port = _right.m_port;
     m_nonblocking = _right.m_nonblocking;
     
     _right.m_fd = -1; // prevent old socket close on destruction
@@ -119,6 +120,27 @@ bool socket::is(state _st) const
     return m_state == _st;
 }
 
+uint16_t socket::port() const
+{
+    return m_port;
+}
+
+bool socket::can_read() const
+{
+    if (m_fd == -1)
+        return false;
+    
+    int nread;
+    ioctl(m_fd, FIONREAD, &nread);
+    
+    return nread > 0;
+}
+
+/*bool socket::is_nonblocking() const
+{
+    return m_nonblocking;
+}*/
+
 void socket::set_nonblocking(bool _flag)
 {
     if (m_fd == -1)
@@ -138,19 +160,16 @@ void socket::set_nonblocking(bool _flag)
     if (fcntl(m_fd, F_SETFL, opts) < 0)
         throw channel::error("can't set socket options");
 
+#elif defined(WIN32)
+
+    u_long iMode = _flag ? 1 : 0;
+
+    auto iResult = ioctlsocket(m_fd, FIONBIO, &iMode);
+    if (iResult != NO_ERROR)
+        throw error("can't set non-blocking status");
 #endif
 
     m_nonblocking = _flag;
-}
-
-// ------------------------------------------------------------------------------------------
-
-void socket::set_close_on_exec()
-{
-    if (m_fd == -1)
-        return;
-    
-    fcntl(m_fd, F_SETFD, FD_CLOEXEC);
 }
 
 // ------------------------------------------------------------------------------------------
@@ -211,7 +230,7 @@ size_t socket::send(const uint8_t* _data, size_t _size)
                 if (m_nonblocking)
                     return total_sent; // >= 0
 
-                throw socket::timeout();
+                throw timeout();
             }
             else if (errno == EINTR) // wait and try again
             {
@@ -308,7 +327,11 @@ socket socket::accept()
 
     for (;;)
     {
+#ifdef SOCK_CLOEXEC
+        auto res = ::accept4(m_fd, reinterpret_cast<sockaddr*>(&remoteAddr), &addrlen, SOCK_CLOEXEC);
+#else
         auto res = ::accept(m_fd, reinterpret_cast<sockaddr*>(&remoteAddr), &addrlen);
+#endif
         if (res >= 0)
         {
             ipv4_t a;
@@ -332,8 +355,7 @@ socket socket::accept()
             }
             else
             {
-                std::string err = "unknown error while accepting client: " + std::to_string(errno);
-                throw socket::error(err.c_str());
+                throw socket::error("unknown error while accepting client");
             }
         }
     }
@@ -345,7 +367,11 @@ void socket::listen(ipv4_t _address, uint16_t _port, size_t _max_clients, bool _
 {
     if (m_fd == -1)
     {
+#ifdef SOCK_CLOEXEC
+        m_fd = ::socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, IPPROTO_TCP);
+#else
         m_fd = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+#endif
         if (m_fd == -1)
             throw socket::error("can't create socket");
     }
@@ -375,6 +401,7 @@ void socket::listen(ipv4_t _address, uint16_t _port, size_t _max_clients, bool _
         throw socket::error(s.c_str());
     }
 
+    m_port = _port;
     m_state = socket::state::listening;
 }
 
@@ -422,7 +449,7 @@ void socket::listen(std::string_view _adr, size_t _max_clients, bool _share)
         std::string s = "can't listen on socket, errno=" + std::to_string(errno);
         throw socket::error(s.c_str());
     }
-
+    
     m_state = socket::state::listening;
 }
 
@@ -433,7 +460,7 @@ void socket::close()
     if (m_fd != -1)
     {
 #if defined(__APPLE__) || defined(__linux__)
-        //::shutdown(m_fd, SHUT_RDWR);
+        ::shutdown(m_fd, SHUT_RDWR);
         ::close(m_fd);
 #elif defined (WIN32)
         ::closesocket(m_fd);
@@ -444,13 +471,23 @@ void socket::close()
     m_state = socket::state::disconnected;
 }
 
+void socket::set_close_on_exec()
+{
+    if (m_fd != -1)
+        fcntl(m_fd, F_SETFD, FD_CLOEXEC);
+}
+
 // ------------------------------------------------------------------------------------------
 
 void socket::connect(ipv4_t _address, uint16_t _port, unsigned _timeout, ipv4_t _bind_to)
 {
     if (m_fd == -1)
     {
+#ifdef SOCK_CLOEXEC
+        m_fd = ::socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, IPPROTO_TCP);
+#else
         m_fd = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+#endif
         if (m_fd == -1)
             throw socket::error("can't create socket");
     }
@@ -489,7 +526,6 @@ void socket::connect(ipv4_t _address, uint16_t _port, unsigned _timeout, ipv4_t 
     if (res == 0)
     {
         m_state = socket::state::connected;
-        set_nonblocking(false);
         return;
     }
     else if (res == -1)
@@ -621,6 +657,73 @@ void socket::connect(std::string_view _adr, unsigned _timeout)
     }
 
     set_nonblocking(false);
+}
+
+// ------------------------------------------------------------------------------------------
+
+void socket::connect_async(ipv4_t _address, uint16_t _port, ipv4_t _bind_to)
+{
+    if (m_fd == -1)
+    {
+#ifdef SOCK_CLOEXEC
+        m_fd = ::socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, IPPROTO_TCP);
+#else
+        m_fd = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+#endif
+        if (m_fd == -1)
+            throw socket::error("can't create socket");
+    }
+
+    auto fd = m_fd;
+    if (m_state == socket::state::disconnected)
+    {
+        #if defined(__APPLE__)
+            int set = 1;
+            setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &set, sizeof(set));
+        #endif
+        
+        set_nonblocking(true);
+        
+        m_state = socket::state::connecting;
+
+        sockaddr_in sin;
+        memset(&sin, 0, sizeof(sin));
+        sin.sin_family = AF_INET;
+        sin.sin_addr.s_addr = _address.S_addr; // adr->s_addr;
+        sin.sin_port = htons(_port);
+
+        int res = ::connect(fd, reinterpret_cast<sockaddr*>(&sin), sizeof(sin));
+
+        if (res == 0)
+        {
+            m_state = socket::state::connected;
+            return;
+        }
+        else if (res == -1)
+        {
+            if (would_block())
+            {
+                return;
+            }
+            else
+            {
+                auto s = std::string("error during connect_async(), errno=") + std::to_string(errno);
+                throw socket::error(s.c_str());
+            }
+        }
+    }
+    else if (m_state == socket::state::connecting)
+    {
+        int val; socklen_t len = sizeof(val);
+        getsockopt(fd, SOL_SOCKET, SO_ERROR, (char*) &val, &len);
+        if (val == 0)
+            m_state = socket::state::connected;
+        else
+        {
+            auto s = std::string("error during connect_async(), errno=") + std::to_string(val);
+            throw socket::error(s.c_str());
+        }
+    }
 }
 
 } // namespace ez

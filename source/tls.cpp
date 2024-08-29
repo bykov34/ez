@@ -3,6 +3,8 @@
 #include <memory>
 
 #include <tls.h>
+#include <tls_internal.h>
+#include <openssl/x509.h>
 
 #if defined _MSC_VER && defined _M_X64
 using ssize_t = long long;
@@ -76,6 +78,14 @@ tls::~tls()
         tls_config_free(_this.m_config);
     
     _this.~impl();
+}
+
+// ------------------------------------------------------------------------------------------
+
+bool tls::can_read() const
+{
+    const auto& _this = get_const(&m_impl);
+    return _this.m_channel.can_read();
 }
 
 // ------------------------------------------------------------------------------------------
@@ -178,7 +188,11 @@ bool tls::handshake()
 bool tls::is_handshake_complete() const
 {
     auto& _this = get_const(&m_impl);
-    return tls_peer_is_handhake_complete(_this.m_context) != 0;
+    if (_this.m_context == nullptr)
+        return false;
+        
+    struct ::tls* ctx = (struct ::tls*) _this.m_context;
+    return (ctx->state & TLS_HANDSHAKE_COMPLETE);
 }
 
 std::vector<uint8_t> tls::pub_key() const
@@ -187,9 +201,15 @@ std::vector<uint8_t> tls::pub_key() const
     if (_this.m_context == nullptr)
         return {};
     
-    size_t size = 0;
-    auto pubkey = tls_peer_cert_pubkey(_this.m_context, &size);
-    return { pubkey, pubkey + size };
+    struct ::tls* ctx = (struct ::tls*) _this.m_context;
+    if (ctx->ssl_peer_cert == NULL)
+        return {};
+    
+    ASN1_BIT_STRING* pubkey = X509_get0_pubkey_bitstr(ctx->ssl_peer_cert);
+    
+    size_t size = pubkey->length;
+    const unsigned char* data = pubkey->data;
+    return { data, data + size };
 }
 
 // ------------------------------------------------------------------------------------------
@@ -222,7 +242,10 @@ size_t impl::send(const uint8_t* _data, size_t _size)
         }
         else if (res == TLS_WANT_POLLOUT)
         {
-            continue;
+            if (m_config) // tls client
+                continue;
+            else
+                return total_sent;
         }
         else
         {
@@ -280,7 +303,10 @@ size_t impl::recv(uint8_t* _data, size_t _size, size_t _desired_size)
         }
         else if (rcv == TLS_WANT_POLLIN)
         {
-            continue;
+            if (m_config) // tls client
+                continue;
+            else
+                return total_recv;
         }
         else
         {
