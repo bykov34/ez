@@ -20,6 +20,11 @@ set(SOURCES
     source/base64.cpp
     source/url.cpp
     source/smp.cpp
+    source/sha1.cpp
+    source/sha2.cpp
+    source/poly1305.cpp
+    source/chacha20.cpp
+    source/chacha20_poly1305.cpp
 )
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR 
