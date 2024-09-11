@@ -133,7 +133,7 @@ void http::impl::send_request(std::string_view _method, std::string_view _path, 
         req += "\r\n";
     }
     
-    if (_body.size() > 0)
+    if (_body.size() > 0 && !_hdrs.count("Content-Length"))
     {
         req += "Content-Length: " + std::to_string(_body.size());
         req += "\r\n";
