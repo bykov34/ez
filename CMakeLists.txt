@@ -11,6 +11,7 @@ include_directories(
 )
 
 set(SOURCES
+    source/daemon.cpp
     source/ip.cpp
     source/buffer.cpp
     source/socket.cpp

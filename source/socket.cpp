@@ -593,8 +593,6 @@ void socket::connect(std::string_view _adr, unsigned _timeout)
     
     set_nonblocking(true);
 
-    m_state = socket::state::connecting;
-
     struct sockaddr_un local_addr{};
     
     auto sz = std::max(_adr.size(), sizeof(local_addr.sun_path)-1);
