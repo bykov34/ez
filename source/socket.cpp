@@ -153,9 +153,9 @@ void socket::set_nonblocking(bool _flag)
         throw channel::error("can't get socket options");
 
     if (_flag)
-        opts = opts | O_NONBLOCK;
+        opts |= O_NONBLOCK;
     else
-        opts = opts & ~O_NONBLOCK;
+        opts &= ~O_NONBLOCK;
 
     if (fcntl(m_fd, F_SETFL, opts) < 0)
         throw channel::error("can't set socket options");
@@ -170,6 +170,11 @@ void socket::set_nonblocking(bool _flag)
 #endif
 
     m_nonblocking = _flag;
+}
+
+bool socket::is_nonblocking() const
+{
+    return m_nonblocking;
 }
 
 // ------------------------------------------------------------------------------------------
@@ -199,36 +204,31 @@ void socket::set_timeout(unsigned _timeout)
 
 // ------------------------------------------------------------------------------------------
 
-size_t socket::send(const buffer& _data)
+ssize_t socket::send(const buffer& _data)
 {
     return send(_data.ptr(), _data.size());
 }
 
-size_t socket::send(const uint8_t* _data, size_t _size)
+ssize_t socket::send(const uint8_t* _data, size_t _size)
 {
     if (_size == 0)
-        return false;
+        return 0;
 
     if (m_state != socket::state::connected)
         throw socket::error("send fail: socket is not connected");
 
-    size_t total_sent = 0;
     for (;;)
     {
-        auto res = ::send(m_fd, (const char*)(_data + total_sent), _size - total_sent, SEND_FLAGS);
-
-        if (res > 0)
+        if (auto res = ::send(m_fd, (const char*)(_data), _size, SEND_FLAGS); res >= 0)
         {
-            total_sent += res;
-            if (total_sent == _size) // all data is sent
-                return total_sent;
+            return res;
         }
         else if (res == -1)
         {
             if (would_block())
             {
                 if (m_nonblocking)
-                    return total_sent; // >= 0
+                    return -3;
 
                 throw timeout();
             }
@@ -250,51 +250,46 @@ size_t socket::send(const uint8_t* _data, size_t _size)
             }
         }
     }
+    
     // should never come here
 }
 
 // ------------------------------------------------------------------------------------------
 
-size_t socket::recv(buffer& _destination, size_t _desired_size)
+ssize_t socket::recv(buffer& _destination, size_t _desired_size)
 {
     return recv(_destination.ptr(), _destination.size(), _desired_size);
 }
 
-size_t socket::recv(uint8_t* _data, size_t _size, size_t _desired_size)
+ssize_t socket::recv(uint8_t* _data, size_t _size, size_t _desired_size)
 {
     if (m_state != socket::state::connected)
         throw socket::error("recv fail: socket is not connected");
 
     if (_size == 0)
         throw socket::error("recv fail: buffer is full or empty");
-
+        
     if (_size < _desired_size)
         throw socket::error("recv fail: buffer is too small for desired size");
 
-    size_t total_recv = 0;
     for (;;)
     {
-        ssize_t rcv = -1;
-
+        ssize_t result = -1;
         if (_desired_size > 0)
-            rcv = ::recv(m_fd, (char*)(_data + total_recv), _desired_size - total_recv, 0);
+            result = ::recv(m_fd, (char*)(_data), _desired_size, 0);
         else
-            rcv = ::recv(m_fd, (char*)(_data + total_recv), _size - total_recv, 0);
-
-        if (rcv > 0)
-        {
-            total_recv += rcv;
-            if (_desired_size > 0 && total_recv < _desired_size)
-                continue;
+            result = ::recv(m_fd, (char*)(_data), _size, 0);
             
-            return total_recv;
+        if (result > 0)
+        {
+            return result;
         }
-        else if (rcv == -1)
+        else if (result < 0)
         {
             if (would_block()) // TODO: windows error codes
             {
                 if (m_nonblocking)
-                    return total_recv;
+                    return -2;
 
                 throw socket::timeout();
             }
@@ -303,7 +298,7 @@ size_t socket::recv(uint8_t* _data, size_t _size, size_t _desired_size)
             else
                 throw socket::error("socket: unknown error");
         }
-        else // rcv == 0 -> closed by remote side
+        else // result == 0 -> closed by remote side
         {
             close();
             if (m_nonblocking)
@@ -312,6 +307,7 @@ size_t socket::recv(uint8_t* _data, size_t _size, size_t _desired_size)
                 throw socket::error("socket: disconnected");
         }
     }
+    
     // should never come here
 }
 

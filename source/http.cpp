@@ -205,7 +205,7 @@ http::http::request_t http::http::impl::recv_request()
             size_t data_size = 0;
             for (;;) // recv data portion (size unknown, so we loop until necessary amount received)
             {
-                if (auto block_size = m_channel.get().recv(m_buffer, 0); block_size > 0)
+                if (auto block_size = m_channel.get().recv(m_buffer); block_size > 0)
                 {
                     int minor_version = 0;
                     m_buffer.set_position(0);
@@ -296,9 +296,7 @@ http::http::request_t http::http::impl::recv_request()
                     m_buffer.set_position(data_size);
                 }
                 else // would block
-                {
                     return http::http::request_t();
-                }
 
             } //loop
 
@@ -306,9 +304,9 @@ http::http::request_t http::http::impl::recv_request()
 
         case state_e::waiting_body:
         {
-            if (m_chunked)
+            for (;;)
             {
-                for (;;)
+                if (m_chunked)
                 {
                     size_t size = m_body.size();
                     auto ret = phr_decode_chunked(&m_chunked_decoder, (char*) m_body.ptr(), &size);
@@ -317,7 +315,7 @@ http::http::request_t http::http::impl::recv_request()
                         m_body.set_size(m_max_request_body_size);
                         m_body.set_position(m_body.position()+size);
                         
-                        if (auto sz = m_channel.get().recv(m_body, 0); sz > 0)
+                        if (auto sz = m_channel.get().recv(m_body); sz > 0)
                         {
                             m_body.set_size(m_body.position()+sz);
                         }
@@ -336,34 +334,32 @@ http::http::request_t http::http::impl::recv_request()
                     else if (ret == -1)
                         throw error("http: unable to parse chunked content");
                 }
-            }
-            else if (m_new_body_buffer)
-            {
-                auto need = m_body_size - m_body.position();
-                if (auto sz = m_channel.get().recv(m_body, need); sz == need)
+                else if (m_new_body_buffer)
                 {
-                    m_body.set_position(0);
-                    return std::make_tuple(m_method, m_path, m_headers, m_body);
+                    auto need = m_body_size - m_body.position();
+                    if (auto sz = m_channel.get().recv(m_body); sz == need)
+                    {
+                        m_body.set_position(0);
+                        return std::make_tuple(m_method, m_path, m_headers, m_body);
+                    }
+                    else if (sz > 0)
+                        m_body.set_position(m_body.position()+sz);
+                    else // would block
+                        return http::http::request_t();
                 }
-                else // would block
+                else
                 {
-                    m_body.set_position(m_body.position()+sz);
-                    return http::http::request_t();
-                }
-            }
-            else
-            {
-                auto need = m_body_size + m_header_size - m_buffer.position();
-                if (auto sz = m_channel.get().recv(m_buffer, need); sz == need)
-                {
-                    m_buffer.set_position(m_header_size);
-                    m_buffer.set_size(m_header_size+m_body_size); // shrink buffer
-                    return std::make_tuple(m_method, m_path, m_headers, m_buffer);
-                }
-                else // would block
-                {
-                    m_buffer.set_position(m_buffer.position()+sz);
-                    return http::http::request_t();
+                    auto need = m_body_size + m_header_size - m_buffer.position();
+                    if (auto sz = m_channel.get().recv(m_buffer); sz == need)
+                    {
+                        m_buffer.set_position(m_header_size);
+                        m_buffer.set_size(m_header_size+m_body_size); // shrink buffer
+                        return std::make_tuple(m_method, m_path, m_headers, m_buffer);
+                    }
+                    else if (sz > 0)
+                        m_body.set_position(m_body.position()+sz);
+                    else // would block
+                        return http::http::request_t();
                 }
             }
         }
@@ -396,7 +392,7 @@ http::response_t http::impl::recv_response()
             size_t data_size = 0;
             for (;;) // recv data portion (size unknown, so we loop)
             {
-                if (auto block_size = m_channel.get().recv(m_buffer, 0); block_size > 0)
+                if (auto block_size = m_channel.get().recv(m_buffer); block_size > 0)
                 {
                     int minor_version = 0;
                     m_buffer.set_position(0);
@@ -485,9 +481,7 @@ http::response_t http::impl::recv_response()
                     m_buffer.set_position(data_size);
                 }
                 else // would block
-                {
                     return http::response_t();
-                }
 
             } // loop
 
@@ -495,10 +489,11 @@ http::response_t http::impl::recv_response()
 
         case state_e::waiting_body:
         {
-            if (m_chunked)
+            for (;;)
             {
-                for (;;)
+                if (m_chunked)
                 {
+
                     size_t size = m_body.size();
                     auto ret = phr_decode_chunked(&m_chunked_decoder, (char*) m_body.ptr(), &size);
                     if (ret == -2)
@@ -506,7 +501,7 @@ http::response_t http::impl::recv_response()
                         m_body.set_size(m_max_request_body_size);
                         m_body.set_position(m_body.position()+size);
                         
-                        if (auto sz = m_channel.get().recv(m_body, 0); sz > 0)
+                        if (auto sz = m_channel.get().recv(m_body); sz > 0)
                         {
                             m_body.set_size(m_body.position()+sz);
                         }
@@ -525,34 +520,32 @@ http::response_t http::impl::recv_response()
                     else if (ret == -1)
                         throw error("http: unable to parse chunked content");
                 }
-            }
-            else if (m_new_body_buffer)
-            {
-                auto need = m_body_size - m_body.position();
-                if (auto sz = m_channel.get().recv(m_body, need); sz == need)
+                else if (m_new_body_buffer)
                 {
-                    m_body.set_position(0);
-                    return std::make_tuple(m_status, m_message, m_headers, m_body);
+                    auto need = m_body_size - m_body.position();
+                    if (auto sz = m_channel.get().recv(m_body); sz == need)
+                    {
+                        m_body.set_position(0);
+                        return std::make_tuple(m_status, m_message, m_headers, m_body);
+                    }
+                    else if (sz > 0)
+                        m_buffer.set_position(m_buffer.position()+sz);
+                    else // would block
+                        return http::response_t();
                 }
-                else // would block
+                else
                 {
-                    m_body.set_position(m_body.position()+sz);
-                    return http::response_t();
-                }
-            }
-            else
-            {
-                auto need = m_body_size + m_header_size - m_buffer.position();
-                if (auto sz = m_channel.get().recv(m_buffer, need); sz == need)
-                {
-                    m_buffer.set_position(m_header_size);
-                    m_buffer.set_size(m_header_size+m_body_size); // shrink buffer
-                    return std::make_tuple(m_status, m_message, m_headers, m_buffer);
-                }
-                else // would block
-                {
-                    m_buffer.set_position(m_buffer.position()+sz);
-                    return http::response_t();
+                    auto need = m_body_size + m_header_size - m_buffer.position();
+                    if (auto sz = m_channel.get().recv(m_buffer); sz == need)
+                    {
+                        m_buffer.set_position(m_header_size);
+                        m_buffer.set_size(m_header_size+m_body_size); // shrink buffer
+                        return std::make_tuple(m_status, m_message, m_headers, m_buffer);
+                    }
+                    else if (sz > 0)
+                        m_buffer.set_position(m_buffer.position()+sz);
+                    else // would block
+                        return http::response_t();
                 }
             }
         }

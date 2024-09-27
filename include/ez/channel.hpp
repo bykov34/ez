@@ -21,11 +21,12 @@ namespace ez
                 public: timeout(): runtime_error("timeout") {}
             };
             
-            virtual size_t send(const buffer&) = 0;
-            virtual size_t send(const uint8_t* _data, size_t _size) = 0;
-            virtual size_t recv(buffer& _buff, size_t _desired_size = 0) = 0;
-            virtual size_t recv(uint8_t* _data, size_t _size, size_t _desired_size = 0) = 0;
+            virtual ssize_t send(const buffer&) = 0;
+            virtual ssize_t send(const uint8_t* _data, size_t _size) = 0;
+            virtual ssize_t recv(buffer& _buffer, size_t _desired_size = 0) = 0;
+            virtual ssize_t recv(uint8_t* _data, size_t _size, size_t _desired_size = 0) = 0;
         
             virtual bool can_read() const = 0;
+            virtual bool is_nonblocking() const = 0;
     };
 }

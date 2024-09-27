@@ -23,8 +23,8 @@ struct impl
     void connect(std::string_view _host, bool _check_cert);
     void listen();
     
-    size_t recv(uint8_t* _data, size_t _size, size_t _desired_size);
-    size_t send(const uint8_t* _data, size_t _size);
+    ssize_t recv(uint8_t* _data, size_t _size, size_t _desired_size = 0);
+    ssize_t send(const uint8_t* _data, size_t _size);
 };
 
 ::tls* g_scontext = nullptr;
@@ -88,6 +88,12 @@ bool tls::can_read() const
     return _this.m_channel.can_read();
 }
 
+bool tls::is_nonblocking() const
+{
+    const auto& _this = get_const(&m_impl);
+    return _this.m_channel.is_nonblocking();
+}
+
 // ------------------------------------------------------------------------------------------
 
 void tls::reset()
@@ -111,10 +117,10 @@ ssize_t read_cb(struct ::tls* _ctx, void* _buf, size_t _buflen, void* _cb_arg)
     auto _this = reinterpret_cast<impl*>(_cb_arg);
     
     auto recvd = _this->m_channel.recv(reinterpret_cast<uint8_t*>(_buf), _buflen);
-    if (recvd > 0)
+    if (recvd >= 0)
         return recvd;
         
-    if (recvd == 0)
+    if (recvd == -2)
         return TLS_WANT_POLLIN;
     
     return -1;
@@ -125,10 +131,10 @@ ssize_t write_cb(struct ::tls* _ctx, const void* _buf, size_t _buflen, void* _cb
     auto _this = reinterpret_cast<impl*>(_cb_arg);
     
     auto sent = _this->m_channel.send(reinterpret_cast<const uint8_t*>(_buf), _buflen);
-    if (sent > 0)
+    if (sent >= 0)
         return sent;
         
-    if (sent == 0)
+    if (sent == -3)
         return TLS_WANT_POLLOUT;
     
     return -1;
@@ -156,6 +162,8 @@ void impl::connect(std::string_view _host, bool _check_cert)
         tls_config_insecure_noverifycert(m_config);
         tls_config_insecure_noverifyname(m_config);
     }
+    
+    struct ::tls* ctx = (struct ::tls*) m_context;
     
     tls_configure(m_context, m_config);
     tls_connect_cbs(m_context, read_cb, write_cb, this, _host.data());
@@ -215,37 +223,30 @@ std::vector<uint8_t> tls::pub_key() const
 // ------------------------------------------------------------------------------------------
 // channel interface
 
-size_t tls::send(const buffer& _buff)
+ssize_t tls::send(const buffer& _buff)
 {
     auto& _this = get(&m_impl);
     return _this.send(_buff.ptr(), _buff.size());
 }
 
-size_t tls::send(const uint8_t* _data, size_t _size)
+ssize_t tls::send(const uint8_t* _data, size_t _size)
 {
     auto& _this = get(&m_impl);
     return _this.send(_data, _size);
 }
 
-size_t impl::send(const uint8_t* _data, size_t _size)
+ssize_t impl::send(const uint8_t* _data, size_t _size)
 {
-    ssize_t total_sent = 0;
     for (;;)
     {
-        auto res = tls_write(m_context, _data + total_sent, _size - total_sent);
-
-        if (res > 0)
+        if (auto res = tls_write(m_context, _data, _size); res >= 0)
         {
-            total_sent += res;
-            if (total_sent == _size) // all data is sent
-                return total_sent;
+            return res;
         }
         else if (res == TLS_WANT_POLLOUT)
         {
-            if (m_config) // tls client
-                continue;
-            else
-                return total_sent;
+            if (m_channel.is_nonblocking())
+                return -3;
         }
         else
         {
@@ -263,50 +264,39 @@ size_t impl::send(const uint8_t* _data, size_t _size)
 
 // ------------------------------------------------------------------------------------------
 
-size_t tls::recv(buffer& _buff, size_t _desired_size)
+ssize_t tls::recv(buffer& _buff, size_t _desired_size)
 {
     auto& _this = get(&m_impl);
     return _this.recv(_buff.ptr(), _buff.size(), _desired_size);
 }
 
-size_t tls::recv(uint8_t* _data, size_t _size, size_t _desired_size)
+ssize_t tls::recv(uint8_t* _data, size_t _size, size_t _desired_size)
 {
     auto& _this = get(&m_impl);
-    return _this.recv(_data, _size, _desired_size);
+    return _this.recv(_data, _size);
 }
 
-size_t impl::recv(uint8_t* _data, size_t _size, size_t _desired_size)
+ssize_t impl::recv(uint8_t* _data, size_t _size, size_t _desired_size)
 {
-    //if (_size == 0)
-    //    throw error(m_fd, "recv fail: buffer is full or empty");
-
-    //if (_size < _desired_size)
-    //    throw error(m_fd, "recv fail: buffer is too small for desired size");
-
-    size_t total_recv = 0;
+    if (_size < _desired_size)
+        throw channel::error("recv fail: buffer is too small for desired size");
+        
     for (;;)
     {
-        ssize_t rcv = -1;
-
+        ssize_t result = -1;
         if (_desired_size > 0)
-            rcv = tls_read(m_context, _data + total_recv, _desired_size - total_recv);
+            result = tls_read(m_context, _data, _desired_size);
         else
-            rcv = tls_read(m_context, _data + total_recv, _size - total_recv);
-
-        if (rcv > 0)
-        {
-            total_recv += rcv;
-            if (_desired_size > 0 && total_recv < _desired_size)
-                continue;
+            result = tls_read(m_context, _data, _size);
             
-            return total_recv;
-        }
-        else if (rcv == TLS_WANT_POLLIN)
+        if (result >= 0)
         {
-            if (m_config) // tls client
-                continue;
-            else
-                return total_recv;
+            return result;
+        }
+        else if (result == TLS_WANT_POLLIN)
+        {
+            if (m_channel.is_nonblocking())
+                return -2;
         }
         else
         {

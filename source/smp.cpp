@@ -152,8 +152,10 @@ smp::message_t smp::impl::recv()
 
         case state_e::waiting_meta:
         {
-            if (auto sz = m_channel.recv(m_header, sizeof(m_meta)); sz == sizeof(m_meta)) // recv meta size
+            auto need = sizeof(m_meta) - m_header.position();
+            if (auto sz = m_channel.recv(m_header, need); sz == need) // recv meta size
             {
+                m_header.set_position(0);
                 memcpy(m_meta, m_header.ptr(), sizeof(m_meta));
                 if (memcmp(m_meta, MAGIC, 4) == 0)
                 {
@@ -173,13 +175,11 @@ smp::message_t smp::impl::recv()
                 }
                 else
                     throw error("smp: wrong data format");
-                
             }
-            else // would block
-            {
+            else if (sz > 0)
                 m_header.set_position(m_header.position() + sz);
+            else // would block
                 return smp::message_t();
-            }
 
         } [[fallthrough]];
 
@@ -191,11 +191,10 @@ smp::message_t smp::impl::recv()
                 m_header.set_position(0);
                 m_header.set_size(m_header_size); // shrink buffer
             }
-            else // would block
-            {
+            else if (sz > 0)
                 m_header.set_position(m_header.position() + sz);
+            else // would block
                 return smp::message_t();
-            }
 
             if (m_body_size > 0 && m_body_size <= MAX_DATA)
             {
@@ -218,11 +217,10 @@ smp::message_t smp::impl::recv()
                 m_state = state_e::waiting_meta;
                 return { m_header, m_body };
             }
-            else // would block
-            {
+            else if (sz > 0)
                 m_body.set_position(m_body.position() + sz);
+            else // would block
                 return smp::message_t();
-            }
         }
     }
 

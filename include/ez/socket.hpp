@@ -39,6 +39,7 @@ namespace ez
 
             void set_timeout(unsigned _timeout);
             void set_nonblocking(bool _flag);
+            bool is_nonblocking() const;
             void set_close_on_exec();
 
             void listen(ipv4_t _address, uint16_t _port, size_t _max_clients, bool _share);
@@ -52,17 +53,17 @@ namespace ez
 
             // channel interface
 
-            size_t send(const buffer& _data) override;
-            size_t send(const uint8_t* _data, size_t _size) override;
-            size_t recv(buffer& _data, size_t _desired_size = 0) override;
-            size_t recv(uint8_t* _data, size_t _size, size_t _desired_size = 0) override;
-            bool can_read() const override;
+            ssize_t send(const buffer& _data);
+            ssize_t send(const uint8_t* _data, size_t _size);
+            ssize_t recv(buffer& _data, size_t _desired_size = 0);
+            ssize_t recv(uint8_t* _data, size_t _size, size_t _desired_size = 0);
+            bool can_read() const;
     
         private:
             
-            fd_t                    m_fd = -1;
-            uint16_t                m_port = 0;
-            socket::state           m_state = socket::state::disconnected;
-            bool                    m_nonblocking = false;
+            fd_t           m_fd = -1;
+            uint16_t       m_port = 0;
+            socket::state  m_state = socket::state::disconnected;
+            bool           m_nonblocking = false;
     };
 }

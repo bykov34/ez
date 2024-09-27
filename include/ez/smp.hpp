@@ -9,7 +9,7 @@
 
 namespace ez
 {
-    class smp 
+    class smp final
     {
         struct impl; impl* m_impl;
         public:

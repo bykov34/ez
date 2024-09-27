@@ -37,11 +37,12 @@ namespace ez
         
             // channel interface
         
-            size_t send(const buffer& _data) override;
-            size_t send(const uint8_t* _data, size_t _size) override;
-            size_t recv(buffer& _data, size_t _desired_size = 0) override;
-            size_t recv(uint8_t* _data, size_t _size, size_t _desired_size = 0) override;
+            ssize_t send(const buffer& _data) override;
+            ssize_t send(const uint8_t* _data, size_t _size) override;
+            ssize_t recv(buffer& _data, size_t _desired_size = 0) override;
+            ssize_t recv(uint8_t* _data, size_t _size, size_t _desired_size = 0) override;
         
             bool can_read() const override;
+            bool is_nonblocking() const override;
     };
 }
